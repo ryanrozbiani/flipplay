@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="description" content="X Spaces Live + Replay (Master-based) Converter + Player">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Space Converter + Player</title>
+
+  <link rel="shortcut icon" href="https://i.imgur.com/rExrEtv.png" type="image/x-icon">
+
+  <style>
+    *, *:before, *:after { box-sizing: border-box; }
+    * { margin:0; padding:0; text-decoration:none; outline:none; }
+    html, body { background-color:#11131a; color:#AAB8C2; font-family: Arial, sans-serif; }
+
+    a { color:#1da1f2; }
+    a:hover { color:#77c7f9; transition: all .3s !important; }
+
+    .container {
+      display:flex;
+      flex-direction:column;
+      gap:1rem;
+      max-width: 720px;
+      margin: 25px auto;
+      padding: 20px;
+      background-color:#141D26;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,.5);
+    }
+    .container.pz { padding: 0; overflow: hidden; max-width: 720px; }
+
+    textarea {
+      height: 100px;
+      padding: 10px;
+      border: 1px solid #243447;
+      border-radius: 5px;
+      background-color:#1B2836;
+      color:#AAB8C2;
+      resize:none;
+      width: 100%;
+    }
+
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+
+    button {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      padding:10px 12px;
+      background-color:#184d6f;
+      color:#ecf0f1;
+      border: none;
+      border-radius: 5px;
+      cursor:pointer;
+      min-width: 170px;
+    }
+    button:hover { background-color:#1386cc; transition: all .3s !important; }
+    button.secondary { background-color:#1B2836; border:1px solid #243447; }
+    button.secondary:hover { background-color:#223244; }
+
+    label { font-size: 13px; opacity: .95; }
+
+    .info { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+    code { color:#f1517a; }
+    mark { background:none; border-bottom: 2px dotted #1da1f2; color:#AAB8C2; padding-bottom:1px; }
+
+    .error { color:#D8515D!important; border-color:#D8515D!important; }
+    .success { color:#80C14B; border-color:#80C14B; }
+    .warn { color:#e6c15a; border-color:#e6c15a; }
+
+    .status {
+      font-size: 13px;
+      opacity: .95;
+      line-height: 1.4;
+    }
+
+    audio { width: 100%; }
+
+    .loading {
+      background: transparent!important;
+      display:inline-block;
+      width: 13px;
+      height: 13px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius:50%;
+      border-top-color:#fff;
+      animation: spin 1s ease-in-out infinite;
+      -webkit-animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @-webkit-keyframes spin { to { -webkit-transform: rotate(360deg); } }
+
+    details summary {
+      list-style:none;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      font-size: 16px;
+      font-weight:bold;
+      cursor:pointer;
+      user-select:none;
+      padding: 10px 0;
+      opacity: .95;
+    }
+    details summary::-webkit-details-marker { display:none; }
+    details summary::after {
+      content:'';
+      width:0; height:0;
+      border-top:10px solid #928f8f;
+      border-inline:7px solid transparent;
+      transition:0.2s;
+    }
+    details[open] summary::after { transform: rotate(-180deg); }
+    ol { padding: .25rem 0 0 1.25rem; display:flex; flex-direction:column; gap:8px; }
+    li { line-height: 1.6; }
+    li::marker { color:#928f8f; }
+
+    .hint { opacity:.85; font-size:12px; }
+    .hts { background: #1B2836; padding: 0 10px; border-radius: 5px; }
+
+    .sectionTitle {
+      font-size: 14px;
+      opacity: .95;
+      margin-top: 6px;
+    }
+
+    /* Downloader UI */
+    .dlGrid { display:flex; gap:10px; flex-wrap:wrap; }
+    .dlField {
+      flex: 1 1 220px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .dlInput, .dlSelect {
+      width:100%;
+      padding:10px;
+      border-radius:10px;
+      border:1px solid #243447;
+      background:#1B2836;
+      color:#AAB8C2;
+      box-sizing:border-box;
+    }
+    .dlLog {
+      white-space: pre-wrap;
+      font-size: 13px;
+      line-height: 1.35;
+      background:#0a0c10;
+      padding:10px;
+      border-radius:10px;
+      border:1px solid #223;
+      height: 190px;
+      overflow:auto;
+    }
+    .dlToggle {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      user-select:none;
+      font-size: 13px;
+      opacity: .9;
+    }
+    .dlToggle input { transform: translateY(1px); }
+  </style>
+</head>
+
+<body>
+  <!-- ===================================== -->
+  <!-- TOP: LIVE -> REPLAY + PLAYER + DL      -->
+  <!-- ===================================== -->
+  <div class="container">
+    <label for="liveInput">LIVE URL (dynamic)</label>
+    <textarea id="liveInput" placeholder=".../dynamic_playlist.m3u8?type=live"></textarea>
+
+    <div class="row">
+      <button id="playLive">Play Live</button>
+      <button id="getReplayFromLive">Get Replay From Live</button>
+      <button class="secondary" id="copyReplay">Copy Replay</button>
+      <button class="secondary" id="downloadTs">Download (TS)</button>
+      <button class="secondary" id="stop">Stop</button>
+    </div>
+
+    <label for="replayOutput">Replay URL (generated or paste your own)</label>
+    <textarea id="replayOutput" placeholder=".../playlist_###.m3u8?type=replay"></textarea>
+
+    <div class="row">
+      <button id="playReplay">Play Replay</button>
+    </div>
+
+    <audio id="player" controls></audio>
+
+    <div class="status" id="status">Paste Live URL, play Live, or generate Replay from Live.</div>
+
+    <div class="info hint">
+      If browser playback fails, copy the URL into
+      <code>(<a href="https://mpv.io" target="_blank">MPV</a>, <a href="https://www.videolan.org/vlc/" target="_blank">VLC</a>)</code>.
+    </div>
+
+    <details>
+      <summary>How this works</summary>
+      <ol>
+        <li>You paste the <mark>Live dynamic URL</mark>: <code>.../dynamic_playlist.m3u8?type=live</code></li>
+        <li>Button fetches <mark>master_playlist.m3u8</mark>, finds <code>playlist_###.m3u8</code>, builds <mark>Replay URL</mark> with <code>type=replay</code></li>
+        <li>Replay URL is what you play or copy</li>
+      </ol>
+    </details>
+
+    <details>
+      <summary>Downloader (browser-only)</summary>
+
+      <div class="hint">
+        This downloads the replay stream by fetching all segments and merging them into a single file.
+        If direct CORS fails, keep "Use CORS proxy" enabled.
+      </div>
+
+      <div class="dlGrid" style="margin-top:10px;">
+        <div class="dlField">
+          <label for="dlFilename">Output filename</label>
+          <input id="dlFilename" class="dlInput" value="xspace_replay.aac" />
+        </div>
+
+        <div class="dlField">
+          <label for="dlConcurrency">Concurrency</label>
+          <select id="dlConcurrency" class="dlSelect">
+            <option value="2">2 (safer)</option>
+            <option value="4" selected>4</option>
+            <option value="6">6</option>
+            <option value="8">8 (riskier)</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="dlToggle" style="margin-top:10px;">
+        <input type="checkbox" id="dlUseProxy" checked />
+        Use CORS proxy (recommended for X Spaces)
+      </label>
+
+      <label style="margin-top:10px; display:block;">Optional headers (one per line)</label>
+      <textarea id="dlHeaders" rows="4" placeholder="Authorization: Bearer ...&#10;Cookie: a=b; c=d"></textarea>
+
+      <div class="row" style="margin-top:10px;">
+        <button id="dlAnalyze">Analyze Replay URL</button>
+        <button id="dlDownload" disabled>Download</button>
+      </div>
+
+      <div class="dlLog" id="dlLog"></div>
+
+      <div class="hint" style="margin-top:8px;">
+        Want MP3? Convert with ffmpeg (desktop):
+        <code>ffmpeg -i xspace_replay.ts -vn -c:a libmp3lame -b:a 128k out.mp3</code>
+      </div>
+    </details>
+  </div>
+
+  <!-- ===================================== -->
+  <!-- SECTION: DYNAMIC -> REPLAY (INVERTER)  -->
+  <!-- ===================================== -->
+  <div class="container">
+    <div class="sectionTitle">Inverser (Dynamic to Replay)</div>
+
+    <label for="invInput">Paste Dynamic URL:</label>
+    <textarea id="invInput" placeholder=".../dynamic_playlist.m3u8?type=live"></textarea>
+
+    <div class="row">
+      <button id="invGetReplay">Get Replay URL</button>
+      <button class="secondary" id="invCopy">Copy</button>
+    </div>
+
+    <label for="invResult">Result (Replay URL):</label>
+    <textarea id="invResult" readonly placeholder="Result will appear here"></textarea>
+
+    <div class="info hint">
+      Copy the result and paste into a player
+      <code>(<a href="https://mpv.io" target="_blank">MPV</a>, <a href="https://www.videolan.org/vlc/" target="_blank">VLC</a>)</code>.
+    </div>
+  </div>
+
+  <div class="container pz">
+    <details>
+      <summary>How to:</summary>
+      <ol>
+        <li>Get <mark>Dynamic URL</mark> while a Space is <mark>live</mark>.</li>
+        <li>Paste <mark>Dynamic URL</mark> after the Space ends.</li>
+        <li>Click <mark>Get Replay URL</mark>.</li>
+        <li class="hts">If the site breaks, save locally with <mark>ctrl+s</mark> and open the saved file.</li>
+      </ol>
+    </details>
+  </div>
+
+  <!-- ===================================== -->
+  <!-- SECTION: MASTER -> DYNAMIC + REPLAY     -->
+  <!-- (THIS IS THE ONE YOU JUST POSTED)      -->
+  <!-- ===================================== -->
+  <div class="container">
+    <div class="sectionTitle">Master to Dynamic + Replay</div>
+
+    <label for="m2dr_input">Paste Master URL:</label>
+    <textarea id="m2dr_input" placeholder=".../master_playlist.m3u8"></textarea>
+
+    <div class="row">
+      <button id="m2dr_convertBtn">Get Dynamic + Replay</button>
+      <button class="secondary" id="m2dr_autoBtn" title="Optional: paste a replay or dynamic URL and it will still work">Try Auto Detect</button>
+    </div>
+
+    <label for="m2dr_dynamicOut">Dynamic URL (live):</label>
+    <textarea id="m2dr_dynamicOut" readonly placeholder="Dynamic URL will appear here"></textarea>
+    <div class="info">
+      <button class="secondary" id="m2dr_copyDynamic">Copy Dynamic</button>
+      <span>Use this in your detector workflow while a Space is <mark>live</mark>.</span>
+    </div>
+
+    <label for="m2dr_replayOut">Replay URL (playlist_N + type=replay):</label>
+    <textarea id="m2dr_replayOut" readonly placeholder="Replay URL will appear here"></textarea>
+    <div class="info">
+      <button class="secondary" id="m2dr_copyReplay">Copy Replay</button>
+      <span>Paste into a player <code>(<a href="https://mpv.io" target="_blank">MPV</a>, <a href="https://www.videolan.org/vlc/" target="_blank">VLC</a>)</code>.</span>
+    </div>
+  </div>
+
+  <div class="container pz">
+    <details>
+      <summary>How to:</summary>
+      <ol>
+        <li>Paste the <mark>Master URL</mark> (ends with <code>/master_playlist.m3u8</code>).</li>
+        <li>Click <mark>Get Dynamic + Replay</mark>.</li>
+        <li>You will get:
+          <br>1) <mark>Dynamic URL</mark> (for live capture workflows)
+          <br>2) <mark>Replay URL</mark> (the <code>playlist_###.m3u8?type=replay</code> form)
+        </li>
+        <li>If replay extraction fails, your master may be geo-blocked or the proxy is down. Dynamic still works.</li>
+        <li class="hts">If the page breaks, save locally with <mark>ctrl+s</mark> and open the saved file.</li>
+      </ol>
+    </details>
+  </div>
+
+  <script>
+    // One proxy for everything
+    const corsProxy = "https://cors.viddastrage.workers.dev/corsproxy/?apiurl=";
+
+    // Shared XHR helper (used by all sections)
+    function fetchText(url) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", corsProxy + url);
+        xhr.onload = function () {
+          if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.responseText);
+          else reject(new Error(`HTTP ${xhr.status}`));
+        };
+        xhr.onerror = function () { reject(new Error("Network error")); };
+        xhr.send();
+      });
+    }
+
+    function getBaseFromAny(url) {
+      const u = (url || "").trim();
+      const idx = u.indexOf("/audio-space/");
+      if (idx === -1) return "";
+      return u.slice(0, idx + "/audio-space/".length);
+    }
+
+    function copyToClipboard(text) {
+      return navigator.clipboard.writeText(text);
+    }
+
+    function extractPlaylistName(m3u8Text) {
+      const m = (m3u8Text || "").match(/playlist_\d+\.m3u8/);
+      return m ? m[0] : "";
+    }
+
+    // =========================
+    // TOP SECTION: Player + live->replay
+    // =========================
+    const liveEl = document.getElementById("liveInput");
+    const replayTopEl = document.getElementById("replayOutput");
+    const player = document.getElementById("player");
+    const statusEl = document.getElementById("status");
+
+    const btnPlayLive = document.getElementById("playLive");
+    const btnGetReplay = document.getElementById("getReplayFromLive");
+    const btnCopyReplayTop = document.getElementById("copyReplay");
+    const btnStop = document.getElementById("stop");
+    const btnPlayReplay = document.getElementById("playReplay");
+
+    function setStatus(text, type) {
+      statusEl.textContent = text;
+      statusEl.className = "status" + (type ? " " + type : "");
+    }
+
+    function playUrl(url, label) {
+      if (!url) {
+        setStatus(`Missing ${label} URL.`, "error");
+        return;
+      }
+      player.pause();
+      player.src = url;
+      player.load();
+      player.play().catch(() => {});
+      setStatus(`Playing ${label}.`, "success");
+    }
+
+    btnPlayLive.addEventListener("click", (e) => {
+      e.preventDefault();
+      playUrl(liveEl.value.trim(), "Live");
+    });
+
+    btnPlayReplay.addEventListener("click", (e) => {
+      e.preventDefault();
+      playUrl(replayTopEl.value.trim(), "Replay");
+    });
+
+    btnStop.addEventListener("click", (e) => {
+      e.preventDefault();
+      player.pause();
+      player.removeAttribute("src");
+      player.load();
+      setStatus("Stopped.", "");
+    });
+
+    btnCopyReplayTop.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const val = replayTopEl.value.trim();
+      if (!val) return setStatus("No replay URL to copy.", "error");
+      try {
+        await copyToClipboard(val);
+        setStatus("Replay copied.", "success");
+      } catch {
+        setStatus("Copy failed, your browser blocked clipboard.", "error");
+      }
+    });
+
+    // Accepts either:
+    // - dynamic_playlist.m3u8?type=live
+    // - master_playlist.m3u8
+    btnGetReplay.addEventListener("click", async (e) => {
+      e.preventDefault();
+
+      const inputUrl = (liveEl.value || "").trim();
+      if (!inputUrl) return setStatus("Paste a Live dynamic URL (or a Master URL) first.", "error");
+
+      let masterUrl = "";
+      let dynamicUrl = "";
+
+      if (inputUrl.includes("/master_playlist.m3u8")) {
+        masterUrl = inputUrl;
+      } else {
+        dynamicUrl = inputUrl;
+        if (!dynamicUrl.includes("/dynamic_playlist.m3u8") || !dynamicUrl.includes("type=live")) {
+          return setStatus("Live URL must look like .../dynamic_playlist.m3u8?type=live", "error");
+        }
+        masterUrl = dynamicUrl.replace("/dynamic_playlist.m3u8?type=live", "/master_playlist.m3u8");
+        if (!masterUrl.includes("/master_playlist.m3u8")) {
+          return setStatus("Could not build master_playlist.m3u8 URL.", "error");
+        }
+      }
+
+      const oldText = btnGetReplay.textContent;
+      btnGetReplay.innerHTML = '<span class="loading"></span> Working...';
+      setStatus("Fetching master playlist...", "");
+
+      try {
+        const txt = await fetchText(masterUrl);
+        const playlist = extractPlaylistName(txt);
+        if (!playlist) throw new Error("playlist_###.m3u8 not found");
+
+        let replayUrl = "";
+        if (dynamicUrl) {
+          replayUrl = dynamicUrl.replace("dynamic_playlist.m3u8", playlist).replace("type=live", "type=replay");
+          setStatus("Replay URL generated from Live.", "success");
+        } else {
+          const base = masterUrl.slice(0, masterUrl.lastIndexOf("/") + 1);
+          replayUrl = base + playlist + "?type=replay";
+          setStatus("Replay URL generated from Master.", "success");
+        }
+
+        replayTopEl.value = replayUrl;
+      } catch (err) {
+        setStatus(`Error: ${err.message}. Proxy may be down or blocked.`, "error");
+      } finally {
+        btnGetReplay.textContent = oldText;
+      }
+    });
+
+    // Expose helpers for console use
+    window.xspacesCombo = {
+      masterToDynamic: (masterUrl) => {
+        const base = getBaseFromAny(masterUrl);
+        return base ? base + "dynamic_playlist.m3u8?type=live" : "";
+      },
+      masterToReplay: async (masterUrl) => {
+        const base = getBaseFromAny(masterUrl);
+        if (!base || !masterUrl.includes("/master_playlist.m3u8")) throw new Error("Invalid master URL");
+        const txt = await fetchText(masterUrl);
+        const playlist = extractPlaylistName(txt);
+        if (!playlist) throw new Error("playlist_###.m3u8 not found");
+        return base + playlist + "?type=replay";
+      },
+      anyToAll: (anyUrl) => {
+        const base = getBaseFromAny(anyUrl);
+        if (!base) return { base:"", master:"", dynamic:"", replay:"" };
+        return {
+          base,
+          master: base + "master_playlist.m3u8",
+          dynamic: base + "dynamic_playlist.m3u8?type=live",
+          replay: ""
+        };
+      }
+    };
+
+    // =========================
+    // SECTION: Dynamic -> Replay (Inverser)
+    // =========================
+    const invInputEl = document.getElementById("invInput");
+    const invResultEl = document.getElementById("invResult");
+    const invGetBtn = document.getElementById("invGetReplay");
+    const invCopyBtn = document.getElementById("invCopy");
+
+    function invSetResult(text, cls) {
+      invResultEl.value = String(text || "");
+      invResultEl.classList.remove("error", "success", "warn");
+      if (cls) invResultEl.classList.add(cls);
+    }
+
+    invGetBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+
+      const dynamicUrl = (invInputEl.value || "").trim();
+      if (!dynamicUrl || !dynamicUrl.includes("/dynamic_playlist.m3u8") || !dynamicUrl.includes("type=live")) {
+        return invSetResult("Check if Dynamic URL is correct!", "error");
+      }
+
+      const masterUrl = dynamicUrl.replace("/dynamic_playlist.m3u8?type=live", "/master_playlist.m3u8");
+      if (!masterUrl.includes("/master_playlist.m3u8")) {
+        return invSetResult("Check if Dynamic URL is correct!", "error");
+      }
+
+      const old = invGetBtn.textContent;
+      invGetBtn.innerHTML = '<span class="loading"></span> Working...';
+
+      try {
+        const r = await fetchText(masterUrl);
+        const playlist = extractPlaylistName(r);
+        if (!playlist) throw new Error("playlist_###.m3u8 not found");
+
+        const replayUrl = dynamicUrl.replace("dynamic_playlist.m3u8", playlist).replace("type=live", "type=replay");
+        invSetResult(replayUrl, "success");
+      } catch (err) {
+        invSetResult(`Error: ${err.message}.`, "error");
+      } finally {
+        invGetBtn.textContent = old;
+      }
+    });
+
+    invCopyBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const v = (invResultEl.value || "").trim();
+      if (!v) return;
+      try {
+        await copyToClipboard(v);
+        const old = invCopyBtn.textContent;
+        invCopyBtn.textContent = "Copied!";
+        setTimeout(() => invCopyBtn.textContent = old, 1500);
+      } catch {
+        invSetResult("Copy failed, your browser blocked clipboard.", "error");
+      }
+    });
+
+    // =========================
+    // SECTION: Master -> Dynamic + Replay (Your posted inverse)
+    // =========================
+    const m2drInputEl = document.getElementById("m2dr_input");
+    const m2drDynamicEl = document.getElementById("m2dr_dynamicOut");
+    const m2drReplayEl = document.getElementById("m2dr_replayOut");
+    const m2drConvertBtn = document.getElementById("m2dr_convertBtn");
+    const m2drAutoBtn = document.getElementById("m2dr_autoBtn");
+    const m2drCopyDynamicBtn = document.getElementById("m2dr_copyDynamic");
+    const m2drCopyReplayBtn = document.getElementById("m2dr_copyReplay");
+
+    function m2drSetBox(el, text, cls) {
+      el.value = text || "";
+      el.classList.remove("error", "success", "warn");
+      if (cls) el.classList.add(cls);
+    }
+
+    function m2drNormalize(url) { return (url || "").trim(); }
+
+    async function m2drDoInverse(fromUrl) {
+      const raw = m2drNormalize(fromUrl);
+      m2drDynamicEl.classList.remove("error", "success", "warn");
+      m2drReplayEl.classList.remove("error", "success", "warn");
+
+      if (!raw) {
+        m2drSetBox(m2drDynamicEl, "Paste a Master URL first.", "error");
+        m2drSetBox(m2drReplayEl, "", "");
+        return;
+      }
+
+      const base = getBaseFromAny(raw);
+
+      let masterUrl = "";
+      if (raw.includes("/master_playlist.m3u8")) masterUrl = raw;
+      else if (base) masterUrl = base + "master_playlist.m3u8";
+
+      let dynamicUrl = "";
+      if (raw.includes("/dynamic_playlist.m3u8")) {
+        dynamicUrl = raw.includes("type=live") ? raw : (raw.split("?")[0] + "?type=live");
+      } else if (raw.includes("/master_playlist.m3u8")) {
+        dynamicUrl = raw.replace("/master_playlist.m3u8", "/dynamic_playlist.m3u8?type=live");
+      } else if (base) {
+        dynamicUrl = base + "dynamic_playlist.m3u8?type=live";
+      }
+
+      if (!dynamicUrl || !dynamicUrl.includes("/dynamic_playlist.m3u8")) {
+        m2drSetBox(m2drDynamicEl, "Could not parse base URL. Make sure it is a pscp.tv audio-space link.", "error");
+        m2drSetBox(m2drReplayEl, "", "");
+        return;
+      }
+      m2drSetBox(m2drDynamicEl, dynamicUrl, "success");
+
+      if (!masterUrl || !masterUrl.includes("/master_playlist.m3u8")) {
+        m2drSetBox(m2drReplayEl, "Could not derive master URL from input.", "error");
+        return;
+      }
+
+      const old = m2drConvertBtn.textContent;
+      m2drConvertBtn.innerHTML = '<span class="loading"></span> Working';
+
+      try {
+        const masterText = await fetchText(masterUrl);
+        const playlistName = extractPlaylistName(masterText);
+
+        if (!playlistName) {
+          m2drSetBox(
+            m2drReplayEl,
+            "Got master, but could not find playlist_N.m3u8 inside it. Try another proxy or paste a replay URL directly.",
+            "warn"
+          );
+          return;
+        }
+
+        const replayUrl = masterUrl.replace("/master_playlist.m3u8", "/" + playlistName) + "?type=replay";
+        m2drSetBox(m2drReplayEl, replayUrl, "success");
+      } catch (err) {
+        m2drSetBox(
+          m2drReplayEl,
+          "Error: " + (err && err.message ? err.message : "Unknown error") + ". You can still use the Dynamic output.",
+          "error"
+        );
+      } finally {
+        m2drConvertBtn.textContent = old || "Get Dynamic + Replay";
+      }
+    }
+
+    m2drConvertBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      m2drDoInverse(m2drInputEl.value);
+    });
+
+    m2drAutoBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      m2drDoInverse(m2drInputEl.value);
+    });
+
+    m2drCopyDynamicBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const txt = (m2drDynamicEl.value || "").trim();
+      if (!txt) return;
+      try {
+        await copyToClipboard(txt);
+        const old = m2drCopyDynamicBtn.textContent;
+        m2drCopyDynamicBtn.textContent = "Copied!";
+        setTimeout(() => m2drCopyDynamicBtn.textContent = old, 1500);
+      } catch {}
+    });
+
+    m2drCopyReplayBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const txt = (m2drReplayEl.value || "").trim();
+      if (!txt) return;
+      try {
+        await copyToClipboard(txt);
+        const old = m2drCopyReplayBtn.textContent;
+        m2drCopyReplayBtn.textContent = "Copied!";
+        setTimeout(() => m2drCopyReplayBtn.textContent = old, 1500);
+      } catch {}
+    });
+
+    // =========================
+    // Downloader (browser-only)
+    // =========================
+    const dl = {
+      logEl: document.getElementById("dlLog"),
+      btnAnalyze: document.getElementById("dlAnalyze"),
+      btnDownload: document.getElementById("dlDownload"),
+      filenameEl: document.getElementById("dlFilename"),
+      concurrencyEl: document.getElementById("dlConcurrency"),
+      headersEl: document.getElementById("dlHeaders"),
+      useProxyEl: document.getElementById("dlUseProxy"),
+      quickBtn: document.getElementById("downloadTs")
+    };
+
+    function dlLog(msg) {
+      dl.logEl.textContent += msg + "\n";
+      dl.logEl.scrollTop = dl.logEl.scrollHeight;
+    }
+
+    function dlClearLog() {
+      dl.logEl.textContent = "";
+    }
+
+    function parseHeaders(text) {
+      const out = {};
+      (text || "")
+        .split("\n")
+        .map(x => x.trim())
+        .filter(Boolean)
+        .forEach(line => {
+          const idx = line.indexOf(":");
+          if (idx > 0) out[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+        });
+      return out;
+    }
+
+    function resolveUrl(base, rel) {
+      return new URL(rel, base).toString();
+    }
+
+    function maybeProxy(url) {
+      return dl.useProxyEl.checked ? (corsProxy + url) : url;
+    }
+
+    async function dlFetchText(url, headers) {
+      const r = await fetch(maybeProxy(url), { headers, mode: "cors" });
+      if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
+      return await r.text();
+    }
+
+    function isMasterPlaylist(m3u8Text) {
+      return /#EXT-X-STREAM-INF/i.test(m3u8Text);
+    }
+
+    function parseMasterVariants(m3u8Text, baseUrl) {
+      const lines = m3u8Text.split(/\r?\n/);
+      const variants = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith("#EXT-X-STREAM-INF")) {
+          const next = (lines[i + 1] || "").trim();
+          if (next && !next.startsWith("#")) {
+            variants.push({ info: line, url: resolveUrl(baseUrl, next) });
+          }
+        }
+      }
+      return variants;
+    }
+
+    function parseMediaSegments(m3u8Text, baseUrl) {
+      const lines = m3u8Text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const segments = [];
+      let initMap = null;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        if (line.startsWith("#EXT-X-MAP:")) {
+          const m = line.match(/URI="([^"]+)"/);
+          if (m) initMap = resolveUrl(baseUrl, m[1]);
+        }
+
+        if (line.startsWith("#")) continue;
+        segments.push(resolveUrl(baseUrl, line));
+      }
+
+      return { initMap, segments };
+    }
+
+    async function pickVariantIfNeeded(url, headers) {
+      dlLog(`Fetching playlist: ${url}`);
+      const text = await dlFetchText(url, headers);
+
+      if (!isMasterPlaylist(text)) {
+        return { mediaUrl: url, playlistText: text, isMaster: false, variants: [] };
+      }
+
+      const variants = parseMasterVariants(text, url);
+      dlLog(`Master playlist detected. Variants: ${variants.length}`);
+      if (variants.length === 0) throw new Error("Master playlist found but no variants parsed.");
+
+      const chosen = variants[variants.length - 1];
+      dlLog(`Chosen variant: ${chosen.url}`);
+      const mediaText = await dlFetchText(chosen.url, headers);
+      return { mediaUrl: chosen.url, playlistText: mediaText, isMaster: true, variants };
+    }
+
+    async function downloadSegmentsAsBlob(initMap, segUrls, headers, concurrency) {
+      const total = (initMap ? 1 : 0) + segUrls.length;
+      let done = 0;
+
+      const parts = [];
+
+      async function fetchOne(u) {
+        const r = await fetch(maybeProxy(u), { headers, mode: "cors" });
+        if (!r.ok) throw new Error(`HTTP ${r.status} for segment ${u}`);
+        return new Uint8Array(await r.arrayBuffer());
+      }
+
+      if (initMap) {
+        dlLog(`Fetching init segment (fMP4): ${initMap}`);
+        parts.push(await fetchOne(initMap));
+        done++;
+        dlLog(`Progress: ${done}/${total}`);
+      }
+
+      const results = new Array(segUrls.length);
+      let idx = 0;
+
+      async function worker() {
+        while (true) {
+          if (idx >= segUrls.length) return;
+          const myIdx = idx++;
+          const u = segUrls[myIdx];
+          const data = await fetchOne(u);
+          results[myIdx] = data;
+          done++;
+          if (done % 10 === 0 || done === total) dlLog(`Progress: ${done}/${total}`);
+        }
+      }
+
+      const workers = [];
+      for (let i = 0; i < concurrency; i++) workers.push(worker());
+      await Promise.all(workers);
+
+      for (const r of results) parts.push(r);
+
+      const size = parts.reduce((s, p) => s + p.byteLength, 0);
+      const merged = new Uint8Array(size);
+      let offset = 0;
+      for (const p of parts) {
+        merged.set(p, offset);
+        offset += p.byteLength;
+      }
+      return new Blob([merged], { type: "application/octet-stream" });
+    }
+
+    function saveBlob(blob, filename) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(a.href);
+        a.remove();
+      }, 1500);
+    }
+
+    let lastAnalysis = null;
+
+    function syncDownloaderFromReplay() {
+      const r = (replayTopEl.value || "").trim();
+      if (!r) return;
+      const safeAac = `xspace_replay_${Date.now()}.aac`;
+      if (!dl.filenameEl.value.trim()) dl.filenameEl.value = safeAac;
+    }
+
+    dl.quickBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const url = (replayTopEl.value || "").trim();
+      if (!url) return setStatus("Generate or paste a Replay URL first.", "error");
+
+      const panels = document.querySelectorAll("details");
+      for (const p of panels) {
+        if ((p.querySelector("summary")?.textContent || "").includes("Downloader")) p.open = true;
+      }
+
+      syncDownloaderFromReplay();
+      dlClearLog();
+      dlLog("Quick download: using Replay URL from the box above.");
+      dlLog("");
+
+      const headers = parseHeaders(dl.headersEl.value);
+      try {
+        setStatus("Downloader analyzing replay...", "");
+        const { mediaUrl, playlistText, isMaster, variants } = await pickVariantIfNeeded(url, headers);
+        const { initMap, segments } = parseMediaSegments(playlistText, mediaUrl);
+
+        dlLog("");
+        dlLog(`Media playlist: ${mediaUrl}`);
+        dlLog(`Type: ${initMap ? "fMP4 (has EXT-X-MAP)" : "MPEG-TS/AAC (no init map detected)"}`);
+        dlLog(`Segments found: ${segments.length}`);
+        if (isMaster) dlLog(`Variants parsed: ${variants.length}`);
+        if (segments.length === 0) throw new Error("No segments found. This might be a live playlist or needs auth.");
+
+        lastAnalysis = { mediaUrl, initMap, segments, headers };
+        dl.btnDownload.disabled = false;
+        dl.btnDownload.click();
+      } catch (e2) {
+        dlLog("");
+        dlLog("ERROR:");
+        dlLog(String(e2?.message || e2));
+        dlLog("");
+        dlLog("If you see CORS errors in DevTools, keep 'Use CORS proxy' enabled or use a desktop tool.");
+        dl.btnDownload.disabled = true;
+        setStatus("Downloader error, see log.", "error");
+      }
+    });
+
+    dl.btnAnalyze.addEventListener("click", async () => {
+      dlClearLog();
+      lastAnalysis = null;
+
+      const url = (replayTopEl.value || "").trim();
+      if (!url) return dlLog("Generate or paste a Replay URL in the Replay box above first.");
+
+      syncDownloaderFromReplay();
+      const headers = parseHeaders(dl.headersEl.value);
+
+      try {
+        setStatus("Analyzing replay...", "");
+        const { mediaUrl, playlistText, isMaster, variants } = await pickVariantIfNeeded(url, headers);
+        const { initMap, segments } = parseMediaSegments(playlistText, mediaUrl);
+
+        dlLog("");
+        dlLog(`Media playlist: ${mediaUrl}`);
+        dlLog(`Type: ${initMap ? "fMP4 (has EXT-X-MAP)" : "MPEG-TS/AAC (no init map detected)"}`);
+        dlLog(`Segments found: ${segments.length}`);
+        if (isMaster) dlLog(`Variants parsed: ${variants.length}`);
+        if (segments.length === 0) throw new Error("No segments found. This might be a live playlist that updates or needs auth.");
+
+        lastAnalysis = { mediaUrl, initMap, segments, headers };
+        dl.btnDownload.disabled = false;
+        setStatus("Analyze complete, ready to download.", "success");
+      } catch (e) {
+        dlLog("");
+        dlLog("ERROR:");
+        dlLog(String(e?.message || e));
+        dlLog("");
+        dlLog("If you see CORS errors in DevTools, keep 'Use CORS proxy' enabled or use a desktop tool.");
+        dl.btnDownload.disabled = true;
+        setStatus("Analyze failed, see log.", "error");
+      }
+    });
+
+    dl.btnDownload.addEventListener("click", async () => {
+      if (!lastAnalysis) return;
+
+      dl.btnDownload.disabled = true;
+
+      const { initMap, segments, headers } = lastAnalysis;
+      const filename = (dl.filenameEl.value.trim() || "xspace_replay.aac");
+      const concurrency = parseInt(dl.concurrencyEl.value, 10) || 4;
+
+      try {
+        setStatus(`Downloading segments (x${concurrency})...`, "");
+        dlLog("");
+        dlLog(`Starting download with concurrency=${concurrency} ...`);
+        const blob = await downloadSegmentsAsBlob(initMap, segments, headers, concurrency);
+        dlLog("Merging complete. Saving file...");
+        saveBlob(blob, filename);
+        dlLog(`Saved: ${filename}`);
+        setStatus("Download started.", "success");
+      } catch (e) {
+        dlLog("");
+        dlLog("ERROR:");
+        dlLog(String(e?.message || e));
+        setStatus("Download failed, see log.", "error");
+      } finally {
+        dl.btnDownload.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
