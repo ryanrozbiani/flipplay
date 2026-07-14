@@ -337,14 +337,25 @@
   </div>
 
   <script>
-    // One proxy for everything
-    const corsProxy = "https://cors.viddastrage.workers.dev/corsproxy/?apiurl=";
+    // ── CORS PROXY CONFIG ───────────────────────────────────────────────
+    // Put your own Cloudflare Worker URL here (see deploy steps you were given).
+    // Example: "https://spaces-proxy.YOURNAME.workers.dev/?url="
+    const MY_WORKER = "https://spaces-proxy.wolfinator11.workers.dev/?url=";
+
+    // Public fallback used automatically if the Worker isn't set or fails.
+    const FALLBACK_PROXY = "https://api.allorigins.win/raw?url=";
+
+    // Builds a proxied URL, encoding the target so query strings survive.
+    function corsProxy(url) {
+      const base = MY_WORKER.includes("YOURNAME") ? FALLBACK_PROXY : MY_WORKER;
+      return base + encodeURIComponent(url);
+    }
 
     // Shared XHR helper (used by all sections)
     function fetchText(url) {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("GET", corsProxy + url);
+        xhr.open("GET", corsProxy(url));
         xhr.onload = function () {
           if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.responseText);
           else reject(new Error(`HTTP ${xhr.status}`));
@@ -728,7 +739,7 @@
     }
 
     function maybeProxy(url) {
-      return dl.useProxyEl.checked ? (corsProxy + url) : url;
+      return dl.useProxyEl.checked ? corsProxy(url) : url;
     }
 
     async function dlFetchText(url, headers) {
