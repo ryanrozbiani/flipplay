@@ -432,28 +432,18 @@
         return;
       }
 
-      // HLS via hls.js, routing playlist + every segment through the proxy.
+      // HLS via hls.js. Key: let hls.js see the REAL urls so it resolves
+      // relative segment paths against the correct base. Only add the proxy
+      // at the final network layer, where every url is already absolute.
       if (window.Hls && Hls.isSupported()) {
-        const PROXY_BASE = corsProxy(""); // e.g. https://worker/?url=
-
-        // Given any URL hls.js hands us (which may already be proxied,
-        // because relative segments resolve against the proxied manifest),
-        // recover the true target and proxy it exactly once.
-        function reproxy(u) {
-          if (!u) return u;
-          let real = u;
-          const idx = u.indexOf(PROXY_BASE);
-          if (idx !== -1) {
-            const enc = u.slice(idx + PROXY_BASE.length);
-            try { real = decodeURIComponent(enc); } catch (e) { real = enc; }
-          }
-          return corsProxy(real);
-        }
-
         const hls = new Hls({
           loader: class extends Hls.DefaultConfig.loader {
             load(context, config, callbacks) {
-              if (context && context.url) context.url = reproxy(context.url);
+              if (context && context.url) {
+                // context.url is a real absolute URL (hls.js already resolved it).
+                const realUrl = context.url;
+                context.url = corsProxy(realUrl);
+              }
               super.load(context, config, callbacks);
             }
           }
@@ -461,10 +451,12 @@
         currentHls = hls;
         hls.on(Hls.Events.ERROR, (evt, data) => {
           if (data && data.fatal) {
-            setStatus(`Playback error (${data.type}). Try MPV/VLC, or the replay may have expired.`, "error");
+            const detail = data.details ? ` [${data.details}]` : "";
+            setStatus(`Playback error (${data.type})${detail}. Try MPV/VLC, or the replay may have expired.`, "error");
           }
         });
-        hls.loadSource(corsProxy(url));
+        // Pass the REAL url (not proxied) so base resolution is correct.
+        hls.loadSource(url);
         hls.attachMedia(player);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           player.play().catch(() => {});
