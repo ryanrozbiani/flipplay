@@ -434,13 +434,26 @@
 
       // HLS via hls.js, routing playlist + every segment through the proxy.
       if (window.Hls && Hls.isSupported()) {
+        const PROXY_BASE = corsProxy(""); // e.g. https://worker/?url=
+
+        // Given any URL hls.js hands us (which may already be proxied,
+        // because relative segments resolve against the proxied manifest),
+        // recover the true target and proxy it exactly once.
+        function reproxy(u) {
+          if (!u) return u;
+          let real = u;
+          const idx = u.indexOf(PROXY_BASE);
+          if (idx !== -1) {
+            const enc = u.slice(idx + PROXY_BASE.length);
+            try { real = decodeURIComponent(enc); } catch (e) { real = enc; }
+          }
+          return corsProxy(real);
+        }
+
         const hls = new Hls({
-          // Prepend the proxy to every URL hls.js requests.
           loader: class extends Hls.DefaultConfig.loader {
             load(context, config, callbacks) {
-              if (context && context.url && !context.url.startsWith(corsProxy(""))) {
-                context.url = corsProxy(context.url);
-              }
+              if (context && context.url) context.url = reproxy(context.url);
               super.load(context, config, callbacks);
             }
           }
