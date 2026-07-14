@@ -336,6 +336,7 @@
     </details>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
   <script>
     // ── CORS PROXY CONFIG ───────────────────────────────────────────────
     // Put your own Cloudflare Worker URL here (see deploy steps you were given).
@@ -400,16 +401,75 @@
       statusEl.className = "status" + (type ? " " + type : "");
     }
 
+    let currentHls = null;
+
+    function stopPlayback() {
+      try { player.pause(); } catch (e) {}
+      if (currentHls) {
+        try { currentHls.destroy(); } catch (e) {}
+        currentHls = null;
+      }
+      player.removeAttribute("src");
+      try { player.load(); } catch (e) {}
+    }
+
     function playUrl(url, label) {
       if (!url) {
         setStatus(`Missing ${label} URL.`, "error");
         return;
       }
-      player.pause();
-      player.src = url;
-      player.load();
-      player.play().catch(() => {});
-      setStatus(`Playing ${label}.`, "success");
+
+      stopPlayback();
+
+      const isM3u8 = /\.m3u8(\?|$)/i.test(url);
+
+      // Non-HLS: just play directly (still proxied for CORS).
+      if (!isM3u8) {
+        player.src = corsProxy(url);
+        player.load();
+        player.play().catch(() => {});
+        setStatus(`Playing ${label}.`, "success");
+        return;
+      }
+
+      // HLS via hls.js, routing playlist + every segment through the proxy.
+      if (window.Hls && Hls.isSupported()) {
+        const hls = new Hls({
+          // Prepend the proxy to every URL hls.js requests.
+          loader: class extends Hls.DefaultConfig.loader {
+            load(context, config, callbacks) {
+              if (context && context.url && !context.url.startsWith(corsProxy(""))) {
+                context.url = corsProxy(context.url);
+              }
+              super.load(context, config, callbacks);
+            }
+          }
+        });
+        currentHls = hls;
+        hls.on(Hls.Events.ERROR, (evt, data) => {
+          if (data && data.fatal) {
+            setStatus(`Playback error (${data.type}). Try MPV/VLC, or the replay may have expired.`, "error");
+          }
+        });
+        hls.loadSource(corsProxy(url));
+        hls.attachMedia(player);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          player.play().catch(() => {});
+        });
+        setStatus(`Playing ${label}.`, "success");
+        return;
+      }
+
+      // Safari path: native HLS. Proxy the top playlist; Safari handles the rest.
+      if (player.canPlayType("application/vnd.apple.mpegurl")) {
+        player.src = corsProxy(url);
+        player.load();
+        player.play().catch(() => {});
+        setStatus(`Playing ${label} (native HLS).`, "success");
+        return;
+      }
+
+      setStatus("This browser can't play HLS. Copy the URL into MPV or VLC.", "error");
     }
 
     btnPlayLive.addEventListener("click", (e) => {
@@ -424,9 +484,7 @@
 
     btnStop.addEventListener("click", (e) => {
       e.preventDefault();
-      player.pause();
-      player.removeAttribute("src");
-      player.load();
+      stopPlayback();
       setStatus("Stopped.", "");
     });
 
